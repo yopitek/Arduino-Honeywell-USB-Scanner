@@ -1,0 +1,159 @@
+#include <hidboot.h>
+
+#include <usbhub.h>
+
+#include <SPI.h>
+
+// Create USB and USB Hub instances
+
+USB Usb;
+
+USBHub Hub(&Usb);
+
+// Create HID instance for the scanner
+
+HIDBoot<USB_HID_PROTOCOL_KEYBOARD> Keyboard(&Usb);
+
+class KbdRptParser : public KeyboardReportParser {
+
+private:
+
+char buffer[128];  // Buffer to store scanned data
+
+uint8_t bufferIndex;
+
+bool isScanning;
+
+protected:
+
+void OnKeyDown(uint8_t mod, uint8_t key);
+
+void OnKeyUp(uint8_t mod, uint8_t key);
+
+public:
+
+KbdRptParser() : bufferIndex(0), isScanning(false) {
+
+memset(buffer, 0, sizeof(buffer));
+
+}
+
+};
+
+void KbdRptParser::OnKeyDown(uint8_t mod, uint8_t key) {
+
+uint8_t c = OemToAscii(mod, key);
+
+if (c) {
+
+if (c == '\r' || c == '\n') {  // End of scan
+
+if (bufferIndex > 0) {
+
+buffer[bufferIndex] = '\0';
+
+Serial.print(F("Scanned Code: "));
+
+Serial.println(buffer);
+
+// Reset buffer
+
+bufferIndex = 0;
+
+memset(buffer, 0, sizeof(buffer));
+
+}
+
+}
+
+else if (bufferIndex < sizeof(buffer) - 1) {
+
+buffer[bufferIndex++] = c;
+
+}
+
+}
+
+}
+
+void KbdRptParser::OnKeyUp(uint8_t mod, uint8_t key) {
+
+// Not used in this example
+
+}
+
+KbdRptParser Parser;
+
+void setup() {
+
+// Initialize serial communication
+
+Serial.begin(115200);
+
+delay(200);  // Give some time for serial to initialize
+
+Serial.println(F("Honeywell OH430 Scanner Test"));
+
+Serial.println(F("Initializing USB Host Shield..."));
+
+// Initialize USB Host Shield
+
+if (Usb.Init() == -1) {
+
+Serial.println(F("USB Host Shield initialization failed!"));
+
+while (1); // Halt
+
+}
+
+Serial.println(F("USB Host Shield initialized"));
+
+Serial.println(F("Waiting for scanner connection..."));
+
+// Set the parser
+
+Keyboard.SetReportParser(0, &Parser);
+
+// Additional debug information
+
+Serial.print(F("USB Host Shield Revision: "));
+
+Serial.println(Usb.getUsbTaskState(), HEX);
+
+}
+
+void loop() {
+
+Usb.Task();
+
+// Add USB state monitoring
+
+static uint32_t lastConnectionCheck = 0;
+
+if (millis() - lastConnectionCheck > 1000) {  // Check every second
+
+lastConnectionCheck = millis();
+
+if (Usb.getUsbTaskState() == USB_STATE_RUNNING) {
+
+// USB is connected and running
+
+if (!Keyboard.isReady()) {
+
+Serial.println(F("Scanner not ready"));
+
+}
+
+} else {
+
+Serial.println(F("USB not connected or not ready"));
+
+Serial.print(F("USB State: "));
+
+Serial.println(Usb.getUsbTaskState(), HEX);
+
+}
+
+}
+
+}
