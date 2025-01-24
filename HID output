@@ -1,7 +1,8 @@
+//Using Arduino Leonardo+Arduino USB Host Shield+Honeywell OH430 USB Scanner
+//Output scan result on Arduino IDE serial monitor. 
+
 #include <hidboot.h>
-
 #include <usbhub.h>
-
 #include <SPI.h>
 
 // Create USB and USB Hub instances
